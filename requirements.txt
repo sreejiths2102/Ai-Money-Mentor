@@ -1,0 +1,6 @@
+streamlit
+openai
+google-generativeai
+anthropic
+hypothesis
+pytest
