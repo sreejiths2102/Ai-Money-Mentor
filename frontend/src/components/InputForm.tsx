@@ -1,30 +1,37 @@
 import React, { useState } from "react";
 import type { FormData } from "../types";
+import { FileStack, Flame, ShieldAlert } from "lucide-react";
 
 interface Props { onSubmit: (d: FormData) => void; loading: boolean; }
 
 const INIT: FormData = {
-  annual_salary: 0, deductions: 0, investments: 0,
-  has_80c: false, has_nps: false, has_hra: false,
+  annual_salary: 3200000, deductions: 0, investments: 0,
+  has_80c: true, has_nps: false, has_hra: true,
   has_home_loan: false, has_health_insurance: false,
   risk_profile: "moderate",
-  age: 30, monthly_income: 0, monthly_expenses: 0,
-  current_savings: 0, goal_amount: 0, retirement_age: 60,
+  age: 29, monthly_income: 0, monthly_expenses: 0,
+  current_savings: 0, goal_amount: 0, retirement_age: 45,
   monthly_emi: 0, emergency_fund_months: 0,
   has_term_insurance: false, has_health_cover: false,
   health_cover_lakhs: 0, num_asset_classes: 1,
   annual_tax_saved: 0, has_retirement_account: false,
 };
 
-function Num({ label, name, value, onChange, min = 0, step = 1000 }: {
+function Num({ label, name, value, onChange, min = 0, step = 1000, prefix = "₹" }: {
   label: string; name: keyof FormData; value: number;
-  onChange: (n: keyof FormData, v: number) => void; min?: number; step?: number;
+  onChange: (n: keyof FormData, v: number) => void; min?: number; step?: number; prefix?: string;
 }) {
   return (
     <div className="field">
-      <label htmlFor={name}>{label}</label>
-      <input id={name} type="number" min={min} step={step} value={value}
-        onChange={e => onChange(name, parseFloat(e.target.value) || 0)} />
+      <div className="input-container" style={{ flexDirection: 'column', alignItems: 'flex-start', padding: '0.6rem 1rem' }}>
+        <label htmlFor={name} className="field-label" style={{ marginBottom: '0.2rem' }}>{label}</label>
+        <div style={{ display: 'flex', width: '100%', gap: '0.5rem', alignItems: 'center' }}>
+          {prefix && <span className="input-prefix">{prefix}</span>}
+          <input id={name} type="number" min={min} step={step} value={value || ""}
+            onChange={e => onChange(name, parseFloat(e.target.value) || 0)} 
+            placeholder="0" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -34,91 +41,94 @@ function Check({ label, name, value, onChange }: {
   onChange: (n: keyof FormData, v: boolean) => void;
 }) {
   return (
-    <label className="check-label">
-      <input type="checkbox" checked={value}
-        onChange={e => onChange(name, e.target.checked)} />
-      {label}
-    </label>
+    <div className="toggle-wrapper">
+      <span>{label}</span>
+      <label className="toggle-label">
+        <input type="checkbox" checked={value} onChange={e => onChange(name, e.target.checked)} />
+        <div className="toggle-track"></div>
+      </label>
+    </div>
   );
 }
 
 export default function InputForm({ onSubmit, loading }: Props) {
   const [f, setF] = useState<FormData>(INIT);
-  const [err, setErr] = useState("");
 
   const setN = (n: keyof FormData, v: number) => setF(p => ({ ...p, [n]: v }));
   const setB = (n: keyof FormData, v: boolean) => setF(p => ({ ...p, [n]: v }));
-  const setS = (n: keyof FormData, v: string) => setF(p => ({ ...p, [n]: v }));
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    setErr("");
-    if (f.monthly_income <= 0) { setErr("Monthly income must be > 0."); return; }
-    onSubmit(f);
+    
+    // Inject sensible derivations for backend-required fields that are hidden for minimalism
+    const payload = { ...f };
+    payload.monthly_income = payload.annual_salary / 12 || 10000;
+    payload.monthly_expenses = payload.monthly_income * 0.4; // Mock generic 40% expense ratio
+    payload.deductions = 150000; // Mock 1.5L
+    
+    onSubmit(payload);
   };
 
   return (
-    <form onSubmit={submit}>
-      {/* ── Tax ── */}
+    <form id="main-form" onSubmit={submit}>
+      
+      {/* Tax Configuration */}
       <div className="card">
-        <h2>🧾 Tax Details</h2>
+        <div className="card-header">
+          <h3>Tax Configuration</h3>
+          <FileStack size={18} color="var(--text-secondary)" />
+        </div>
         <div className="form-grid">
-          <Num label="Annual Salary (₹)" name="annual_salary" value={f.annual_salary} onChange={setN} />
-          <Num label="Declared Deductions (₹)" name="deductions" value={f.deductions} onChange={setN} />
-          <Num label="Additional Investments (₹)" name="investments" value={f.investments} onChange={setN} />
-          <Num label="Tax Saved This Year (₹)" name="annual_tax_saved" value={f.annual_tax_saved} onChange={setN} />
-        </div>
-        <div className="check-group">
-          <p className="check-title">Deductions already claimed:</p>
-          <Check label="80C (ELSS/PPF/LIC)" name="has_80c" value={f.has_80c} onChange={setB} />
-          <Check label="NPS 80CCD(1B)" name="has_nps" value={f.has_nps} onChange={setB} />
-          <Check label="HRA" name="has_hra" value={f.has_hra} onChange={setB} />
-          <Check label="Home Loan Interest 24(b)" name="has_home_loan" value={f.has_home_loan} onChange={setB} />
-          <Check label="Health Insurance 80D" name="has_health_insurance" value={f.has_health_insurance} onChange={setB} />
-        </div>
-        <div className="field" style={{ marginTop: "0.75rem" }}>
-          <label>Risk Profile</label>
-          <select value={f.risk_profile} onChange={e => setS("risk_profile", e.target.value)}>
-            <option value="conservative">Conservative</option>
-            <option value="moderate">Moderate</option>
-            <option value="aggressive">Aggressive</option>
-          </select>
+          <Num label="Gross Annual Income" name="annual_salary" value={f.annual_salary} onChange={setN} />
+          
+          <div style={{ marginTop: '0.5rem' }}>
+            <div className="field-label" style={{ marginBottom: '0.5rem' }}>Deductions Claimed</div>
+            <div style={{ background: 'var(--bg-input)', borderRadius: 'var(--radius-sm)', padding: '0 1rem' }}>
+              <Check label="80C (ELSS/PPF/LIC)" name="has_80c" value={f.has_80c} onChange={setB} />
+              <Check label="HRA (House Rent Allowance)" name="has_hra" value={f.has_hra} onChange={setB} />
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ── FIRE ── */}
+      {/* FIRE Planner */}
       <div className="card">
-        <h2>🔥 FIRE Path Planner</h2>
+        <div className="card-header">
+          <h3>FIRE Trajectory Planner</h3>
+          <Flame size={18} color="var(--text-secondary)" />
+        </div>
         <div className="form-grid">
-          <Num label="Current Age" name="age" value={f.age} onChange={setN} min={18} step={1} />
-          <Num label="Target Retirement Age" name="retirement_age" value={f.retirement_age} onChange={setN} min={30} step={1} />
-          <Num label="Monthly Take-Home Income (₹)" name="monthly_income" value={f.monthly_income} onChange={setN} />
-          <Num label="Monthly Expenses (₹)" name="monthly_expenses" value={f.monthly_expenses} onChange={setN} step={500} />
-          <Num label="Current Savings / Corpus (₹)" name="current_savings" value={f.current_savings} onChange={setN} step={10000} />
-          <Num label="Financial Goal Amount (₹)" name="goal_amount" value={f.goal_amount} onChange={setN} step={10000} />
+          <div className="split-grid">
+            <Num label="Current Age" name="age" prefix="" step={1} value={f.age} onChange={setN} />
+            <Num label="Retire Age" name="retirement_age" prefix="" step={1} value={f.retirement_age} onChange={setN} />
+          </div>
+          <Num label="Target FIRE Corpus" name="goal_amount" value={f.goal_amount} onChange={setN} />
         </div>
       </div>
 
-      {/* ── Health ── */}
+      {/* Financial Health Diagnostics */}
       <div className="card">
-        <h2>💊 Financial Health</h2>
-        <div className="form-grid">
-          <Num label="Monthly EMI (₹)" name="monthly_emi" value={f.monthly_emi} onChange={setN} step={500} />
-          <Num label="Emergency Fund (months)" name="emergency_fund_months" value={f.emergency_fund_months} onChange={setN} step={0.5} />
-          <Num label="Health Cover (₹ Lakhs)" name="health_cover_lakhs" value={f.health_cover_lakhs} onChange={setN} step={1} />
-          <Num label="Asset Classes Invested In (1–6)" name="num_asset_classes" value={f.num_asset_classes} onChange={setN} min={1} step={1} />
+        <div className="card-header">
+          <h3>Financial Health Diagnostics</h3>
+          <ShieldAlert size={18} color="var(--text-secondary)" />
         </div>
-        <div className="check-group">
-          <Check label="Have Term Insurance" name="has_term_insurance" value={f.has_term_insurance} onChange={setB} />
-          <Check label="Have Health Insurance" name="has_health_cover" value={f.has_health_cover} onChange={setB} />
-          <Check label="Have NPS / EPF / PPF account" name="has_retirement_account" value={f.has_retirement_account} onChange={setB} />
+        <div className="form-grid">
+          <Num label="Total Liquid Assets" name="current_savings" value={f.current_savings} onChange={setN} />
+          
+          <div style={{ marginTop: '0.5rem' }}>
+             <div className="field-label" style={{ marginBottom: '0.5rem' }}>Protection Status</div>
+             <div style={{ background: 'var(--bg-input)', borderRadius: 'var(--radius-sm)', padding: '0 1rem' }}>
+               <Check label="Term Life Insurance" name="has_term_insurance" value={f.has_term_insurance} onChange={setB} />
+               <Check label="Comprehensive Health Cover" name="has_health_cover" value={f.has_health_cover} onChange={setB} />
+             </div>
+          </div>
         </div>
       </div>
 
-      {err && <div className="error-box">{err}</div>}
-      <button className="btn-primary" type="submit" disabled={loading}>
-        {loading ? "Analysing…" : "💡 Generate Financial Plan"}
+      <button type="submit" className="btn-report" disabled={loading} style={{ marginTop: '1.5rem', opacity: loading ? 0.6 : 1 }}>
+        {loading ? "PROCESSING..." : "GENERATE REPORT"}
       </button>
+
     </form>
   );
 }
